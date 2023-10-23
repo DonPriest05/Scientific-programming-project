@@ -187,19 +187,6 @@ class MainWindow(QMainWindow):
             new_train_data = new_combined_data.iloc[:len(new_train_data)]
             new_test_data = new_combined_data.iloc[len(new_train_data):]
 
-        # If checkbox is checked run function that will remove highly correlated columns
-        if self.check_cor.isChecked():
-            # Concatenate the train and test data
-            combined_data = pd.concat([new_train_data, new_test_data], axis=0)
-            cor_lvl = float(self.cor_lvl.text())
-            cor_matrix = new_train_data.corr().abs()
-            upper_tri = cor_matrix.where(np.triu(np.ones(cor_matrix.shape), k=1).astype(bool))
-            to_drop = [column for column in upper_tri.columns if any(upper_tri[column] > cor_lvl)]
-            to_drop_index = [combined_data.columns.get_loc(name) for name in to_drop]
-            new_combined_data = combined_data.drop(combined_data.columns[to_drop_index], axis=1)
-            new_train_data = new_combined_data.iloc[:len(new_train_data)]
-            new_test_data = new_combined_data.iloc[len(new_train_data):]
-
     def get_params(self):
         """
         Get hyper parameters for the neural network based on user input
@@ -403,6 +390,7 @@ class MainWindow(QMainWindow):
         Prepare train data for undersampling
         """
         global new_train_data
+        global new_test_data
         global train_pheno
 
         if len(self.neighbour_count.text()) != 0:
@@ -415,11 +403,14 @@ class MainWindow(QMainWindow):
         else:
             strat = 1
 
+        # Obtain indices from new_test_data
+        length_data = len(new_train_data) + len(new_test_data) 
+        
         selection = self.method_undersampling
         cat, num, __, __, __ = split_data(new_train_data)
         set_seeds(self.seed_val)
         set_seed_val(self.seed_val)
-        new_train_data, train_pheno = resample(cat, num, train_pheno, True, False, selection, neighbours=neighbours,
+        new_train_data, train_pheno = resample(cat, num, train_pheno, length_data, True, False, selection, neighbours=neighbours,
                                                seed=self.seed_val,
                                                sampling_strat=strat)
 
@@ -434,13 +425,15 @@ class MainWindow(QMainWindow):
         Prepare train data for oversampling
         """
         global new_train_data
+        global new_test_data
         global train_pheno
-
+        
+        length_data = len(new_train_data) + len(new_test_data) 
         selection = self.method_oversampling
         cat, num, __, __, __ = split_data(new_train_data)
         set_seeds(self.seed_val)
         set_seed_val(self.seed_val)
-        new_train_data, train_pheno = resample(cat, num, train_pheno, False, True, selection, neighbours=1,
+        new_train_data, train_pheno = resample(cat, num, train_pheno, length_data, False, True, selection, neighbours=1,
                                                seed=self.seed_val)
 
     def run_model(self):
@@ -735,7 +728,11 @@ class table_view(QWidget):
             data = pd.concat([pd.concat([new_train_data, new_test_data], axis=0), \
                               pd.concat([train_pheno, test_pheno], axis=0)], axis=1)
 
-            data = data.loc[original_data.index]
+            common_indices = data.index.intersection(original_data.index)
+            other_indices = data.index.difference(original_data.index).sort_values()
+            common_data = data.loc[common_indices]
+            other_data = data.loc[other_indices]
+            data = pd.concat([common_data, other_data])
         else:
             data = original_data
 
