@@ -116,11 +116,6 @@ Moving to the categorize tab to view the table we decide to remove the column'co
 
 We will move to the edit data tab to this column in this case column number 50.
 We also want to remove columns that have a correlation of larger than 0.85.
-After which we run the undersample method with random as parameter, giving us random undersampling to balance the classes.
-
-
-
-
 
 ![My Image](Images/setup.PNG)
 

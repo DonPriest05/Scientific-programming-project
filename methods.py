@@ -720,7 +720,7 @@ def compare_dist_num(fullset, subset):
     plt.show()
 
 
-def resample(cat, num, ph, under, over, name, neighbours=1, seed=0, sampling_strat=1):
+def resample(cat, num, ph, len_data, under, over, name, neighbours=1, seed=0, sampling_strat=1):
     """
     Resamples the data when there is an inbalance of classes using one of the
     alogrithms provided. Either oversamples which assigns majority class samples
@@ -736,6 +736,9 @@ def resample(cat, num, ph, under, over, name, neighbours=1, seed=0, sampling_str
             
     ph: pandas DataFrame
         Contains the phenotypes
+        
+    len_data: int
+        Contains size of the samples in the total data
         
     under: Bool
         True when undersampling is chosen
@@ -774,7 +777,8 @@ def resample(cat, num, ph, under, over, name, neighbours=1, seed=0, sampling_str
     tf.random.set_seed(seed)
 
     pheno = ph
-
+    original_indices = cat.index
+    
     # Prepare Categorical Data
     if not cat.empty:
         data_cat = pd.get_dummies(cat)
@@ -799,9 +803,11 @@ def resample(cat, num, ph, under, over, name, neighbours=1, seed=0, sampling_str
         num = pd.DataFrame(num, columns=num_cols)
     else:
         num = pd.DataFrame()
-
+        
+    all_cols = list(data_cat.columns) + list(num.columns)
     data = pd.concat([data_cat, num], axis=1)
-
+    data.index = original_indices
+    
     # convert to numpy format
     data = np.array(data)
     pheno = np.array(pheno)
@@ -836,6 +842,10 @@ def resample(cat, num, ph, under, over, name, neighbours=1, seed=0, sampling_str
             undersample = RandomUnderSampler(random_state=seed, sampling_strategy=sampling_strat)
             data_re, pheno_re = undersample.fit_resample(data, pheno)
 
+        selected_indices = [original_indices[i] for i in undersample.sample_indices_]
+        data_re = pd.DataFrame(data_re, columns=all_cols, index=selected_indices)
+        pheno_re = pd.DataFrame(pheno_re, index=list(selected_indices))
+
     elif over == True:
         methods = ['SMOTE', 'ADASYN']
         method = [method for method in methods if method == name][0]
@@ -847,23 +857,28 @@ def resample(cat, num, ph, under, over, name, neighbours=1, seed=0, sampling_str
         if method == 'ADASYN':
             oversample = ADASYN()
             data_re, pheno_re = oversample.fit_resample(data, pheno)
+            
+        # After resampling, check and correct any overlapping indices for the oversampled data
+        data_re = pd.DataFrame(data_re, columns=all_cols)
+        synthetic_indices = range(len_data + 1, len_data + 1 + len(data_re))
+        data_re.index = synthetic_indices
+        pheno_re = pd.DataFrame(pheno_re, index=synthetic_indices)
 
     # convert back to dataframe format
-    all_cols = list(data_cat.columns) + list(num.columns)
-    data_re = pd.DataFrame(data_re, columns=all_cols)
     data_re_cat = data_re[data_cat.columns]
     data_re_num = data_re[num.columns]
+    resampled_indices = data_re.index
 
     data_re_cat = undummify(data_re_cat)
     all_cols = list(cat.columns) + list(num.columns)
-    data_re_comb = pd.DataFrame(pd.concat([data_re_cat, data_re_num], axis=1), columns=all_cols)
+    data_re_comb = pd.DataFrame(pd.concat([data_re_cat, data_re_num], axis=1), columns=all_cols, index = resampled_indices)
 
     pheno_temp = np.zeros([len(pheno_re), np.max(pheno_re)])
     for i, p in enumerate(pheno_re):
         pheno_temp[i][p - 1] = 1
 
     pheno_re = pheno_temp
-    pheno_re = pd.DataFrame(pheno_re, columns=ph.columns)
+    pheno_re = pd.DataFrame(pheno_re, columns=ph.columns, index = resampled_indices)
 
     if not data_cat.empty:
         subset_cat = data_re[data_cat_cols]
