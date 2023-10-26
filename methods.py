@@ -17,7 +17,9 @@ from keras.layers import Input
 from keras.layers import Concatenate
 from keras.layers import BatchNormalization
 import tensorflow as tf
+import tensorflow.keras.backend as K
 import random as rn
+from sklearn.metrics import accuracy_score, recall_score, precision_score
 
 pd.options.mode.chained_assignment = None  # default='warn'
 
@@ -480,6 +482,51 @@ def visualize_data(cat_data, selection, num_data, df_pheno):
     return fig
 
 
+def macro_precision(y_true, y_pred):
+    # Convert predictions to one-hot vectors
+    y_pred = K.round(K.clip(y_pred, 0, 1))
+    
+    # Calculate precision for each class
+    true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)), axis=0)
+    predicted_positives = K.sum(K.round(K.clip(y_pred, 0, 1)), axis=0)
+    precision = true_positives / (predicted_positives + K.epsilon())
+    
+    # Average precision across all classes
+    macro_precision = K.mean(precision)
+    
+    return macro_precision
+
+def macro_recall(y_true, y_pred):
+    # Convert predictions to one-hot vectors
+    y_pred = K.round(K.clip(y_pred, 0, 1))
+    
+    # Calculate recall for each class
+    true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)), axis=0)
+    actual_positives = K.sum(K.round(K.clip(y_true, 0, 1)), axis=0)
+    recall = true_positives / (actual_positives + K.epsilon())
+    
+    # Average recall across all classes
+    macro_recall = K.mean(recall)
+    
+    return macro_recall
+
+def random_pred(y_true):
+    accuracies = []
+    recalls = []
+    precisions = []
+    
+    y_random_range = np.random.choice(y_true.columns, size=len(y_true)*100)
+    y_random_splits = np.split(y_random_range, 100)
+    
+    for y_random in y_random_splits:
+        y_random_dummy = pd.get_dummies(y_random).reindex(columns=y_true.columns, fill_value=0)
+
+        accuracies.append(accuracy_score(y_true.values.argmax(axis=1), y_random_dummy.values.argmax(axis=1)))
+        recalls.append(recall_score(y_true, y_random_dummy, average='macro'))
+        precisions.append(precision_score(y_true, y_random_dummy, average='macro'))
+    
+    return np.mean(accuracies), np.mean(precisions), np.mean(recalls)
+
 def model(cat_df, num_df, layers_model, dropout, num=True, cat=True, seed=0):
     """
     Creates a model instance
@@ -569,8 +616,7 @@ def model(cat_df, num_df, layers_model, dropout, num=True, cat=True, seed=0):
 
     # compile model and select metrics to keep track of
     model.compile(loss='categorical_crossentropy', \
-                  metrics=['accuracy', tf.keras.metrics.Precision(name='Precision'),
-                           tf.keras.metrics.Recall(name='Recall')])
+                  metrics=["categorical_accuracy", macro_precision, macro_recall])
     return model
 
 
@@ -645,7 +691,7 @@ def abbreviate_label(label, max_length=10):
 
 
 def compare_dist_cat(fullset, subset):
-    # Combine counts from all categorical variables
+    # Combine counts from all categorical variabls
     observed_counts = subset.sum(axis=0)
     full_counts = fullset.sum(axis=0)
 
@@ -655,7 +701,9 @@ def compare_dist_cat(fullset, subset):
 
     # Calculate empirical CDFs
     observed_cdf = np.cumsum(observed_prop)
+
     full_cdf = np.cumsum(full_prop)
+
 
     # Use the K-S test
     ks_statistic, p_value = ks_2samp(observed_cdf, full_cdf)
@@ -668,18 +716,31 @@ def compare_dist_cat(fullset, subset):
         print(
             "The distributions of cat variables in the subset and the entire dataset are NOT statistically different.")
 
-    # Calculate the absolute difference
-    difference = np.abs(observed_cdf - full_cdf)
-
-    plt.figure(figsize=(10, 6))
-    plt.plot(range(1, len(difference) + 1), difference, label='CDF Difference', marker='o', linestyle='-')
-    plt.title('Difference Between Subset CDF and Full Dataset CDF')
-    plt.xlabel('Categories (encoded)')
-    plt.ylabel('Absolute Difference in Cumulative Proportion')
-    plt.legend()
-    plt.grid(True)
+    fig, axs = plt.subplots(2, 1, figsize=(10, 12))
+    
+    # Calculate the difference between the two CDFs
+    difference = observed_cdf - full_cdf
+    
+    # plot the two CDFs
+    axs[0].plot(range(1, len(observed_cdf) + 1), observed_cdf, 'r--', label='Subset combined CDF', marker='o')
+    axs[0].plot(range(1, len(full_cdf) + 1), full_cdf, 'b-', label='Full Dataset combined CDF', marker='o', alpha=0.4)
+    axs[0].set_title('ECDFs for Subset and Full Dataset')
+    axs[0].set_xlabel('Categories (encoded)')
+    axs[0].set_ylabel('Cumulative Proportion')
+    axs[0].legend()
+    axs[0].grid(True)
+    
+    # plot the difference
+    axs[1].plot(range(1, len(difference) + 1), difference, 'g-', label='Difference between CDFs', marker='o')
+    axs[1].axhline(0, color='black', linestyle='--')  # Add a line at y=0 for reference
+    axs[1].set_title('Difference between the two CDFs')
+    axs[1].set_xlabel('Categories (encoded)')
+    axs[1].set_ylabel('Difference in Cumulative Proportion')
+    axs[1].legend()
+    axs[1].grid(True)
+    
+    plt.tight_layout()
     plt.show()
-
 
 def compare_dist_num(fullset, subset):
     # Number of variables
@@ -844,7 +905,7 @@ def resample(cat, num, ph, len_data, under, over, name, neighbours=1, seed=0, sa
 
         selected_indices = [original_indices[i] for i in undersample.sample_indices_]
         data_re = pd.DataFrame(data_re, columns=all_cols, index=selected_indices)
-        pheno_re = pd.DataFrame(pheno_re, index=list(selected_indices))
+        #pheno_re = pd.DataFrame(pheno_re, index=list(selected_indices))
 
     elif over == True:
         methods = ['SMOTE', 'ADASYN']
@@ -862,7 +923,7 @@ def resample(cat, num, ph, len_data, under, over, name, neighbours=1, seed=0, sa
         data_re = pd.DataFrame(data_re, columns=all_cols)
         synthetic_indices = range(len_data + 1, len_data + 1 + len(data_re))
         data_re.index = synthetic_indices
-        pheno_re = pd.DataFrame(pheno_re, index=synthetic_indices)
+        #pheno_re = pd.DataFrame(pheno_re, index=synthetic_indices)
 
     # convert back to dataframe format
     data_re_cat = data_re[data_cat.columns]

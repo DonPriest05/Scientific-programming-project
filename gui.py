@@ -17,7 +17,9 @@ from PyQt5.QtWidgets import QMainWindow, QApplication, \
     QWidget, QFileDialog, \
     QLineEdit, QTableWidgetItem, QDoubleSpinBox, QCheckBox
 from methods import open_data, split_data, visualize_data, pca_analysis, model \
-    , categorize_ui, set_seed_val, resample, compare_dist_num, compare_dist_cat, scale_for_model
+    , categorize_ui, set_seed_val, resample, compare_dist_num, compare_dist_cat, scale_for_model \
+        , macro_precision, macro_recall, random_pred
+        
 
 import concurrent.futures
 import pandas as pd
@@ -314,7 +316,7 @@ class MainWindow(QMainWindow):
         dummified_train = dummified_data.iloc[:len(data_cat_train)]
         dummified_test = dummified_data.iloc[len(data_cat_train):]
 
-        dummified_train, data_num_train, dummified_test, data_num_test = \
+        __, data_num_train, __, data_num_test = \
             scale_for_model(dummified_train, data_num_train, dummified_test, data_num_test)
 
         # check the distribution between test and training set
@@ -434,8 +436,7 @@ class MainWindow(QMainWindow):
         set_seeds(self.seed_val)
         set_seed_val(self.seed_val)
         new_train_data, train_pheno = resample(cat, num, train_pheno, length_data, False, True, selection, neighbours=1,
-                                               seed=self.seed_val)
-
+                                               seed=self.seed_val)   
     def run_model(self):
         """
         Runs the model(s) using the user input parameters.
@@ -498,22 +499,23 @@ class MainWindow(QMainWindow):
                 results = [ex.submit(models[i].fit, [dummified_train, data_num_train], train_pheno,
                                      validation_data=([dummified_test, data_num_test], test_pheno),
                                      epochs=self.epoch_size,
-                                     verbose=2, batch_size=self.boot_size, shuffle=False) for i in
+                                     verbose=1, batch_size=self.boot_size, shuffle=True) for i in
                            range(len(self.layer_info))]
             elif cat == True:
 
                 results = [
                     ex.submit(models[i].fit, dummified_train, train_pheno,
                               validation_data=(dummified_test, test_pheno),
-                              epochs=self.epoch_size, verbose=2, batch_size=self.boot_size, shuffle=False) for i in
+                              epochs=self.epoch_size, verbose=1, batch_size=self.boot_size, shuffle=True) for i in
                     range(len(self.layer_info))]
             elif num == True:
 
                 results = [ex.submit(models[i].fit, data_num_train, train_pheno,
-                                     validation_data=(data_num_test, test_pheno), epochs=self.epoch_size, verbose=2,
-                                     batch_size=self.boot_size, shuffle=False) for i in range(len(self.layer_info))]
+                                     validation_data=(data_num_test, test_pheno), epochs=self.epoch_size, verbose=1,
+                                     batch_size=self.boot_size, shuffle=True) for i in range(len(self.layer_info))]
             for f in results:
                 histories.append(f.result().history)
+                
 
         # create the ensemble model by combining fit results of all seperate models
         model_input_num = tf.keras.Input(len(list(data_num_train)), name='ensemble_num')
@@ -536,9 +538,7 @@ class MainWindow(QMainWindow):
             ensemble_model = tf.keras.Model(inputs=model_input_num, outputs=ensemble_output)
 
         # compile the ensemble model
-        ensemble_model.compile(loss='categorical_crossentropy', \
-                               metrics=['accuracy', tf.keras.metrics.Precision(name='Precision'),
-                                        tf.keras.metrics.Recall(name='Recall')])
+        ensemble_model.compile(loss='categorical_crossentropy', metrics=["categorical_accuracy", macro_precision, macro_recall])
 
         var = list(dummified_test) + list(data_num_test)
         results_perm = []
@@ -565,33 +565,41 @@ class MainWindow(QMainWindow):
         print('Result is: \n')
 
         print(ensemble_result)
+        
+        # Get precision, recall and accuracy based on a random predictor
+        random_acc, random_recall, random_prec = random_pred(test_pheno)
 
         for hist in histories:
+            
             fig, axs = plt.subplots(3, figsize=(8, 6))  # Create a 4-subplot figure
 
             # accuracy
-            axs[0].plot(hist['accuracy'], label='train accuracy')
-            axs[0].plot(hist['val_accuracy'], label='validation accuracy')
+            axs[0].plot(hist['categorical_accuracy'], label='train accuracy')
+            axs[0].plot(hist['val_categorical_accuracy'], label='validation accuracy')
+            axs[0].axhline(random_acc, color='black', linestyle='--', label='random accuracy test')
             axs[0].set_xlabel('epoch number')
             axs[0].set_ylabel('Accuracy')
             axs[0].legend(loc="upper right")
-
-            # precision
-            axs[1].plot(hist['Precision'], label='train precision')
-            axs[1].plot(hist['val_Precision'], label='test precision')
+    
+            # macro precision
+            axs[1].plot(hist['macro_precision'], label='train macro precision')  
+            axs[1].plot(hist['val_macro_precision'], label='validation macro precision') 
+            axs[1].axhline(random_prec, color='black', linestyle='--', label='random precision test')
             axs[1].set_xlabel('epoch number')
-            axs[1].set_ylabel('Precision')
+            axs[1].set_ylabel('Macro Precision')  # <-- Updated here
             axs[1].legend(loc="upper right")
-
-            # recall
-            axs[2].plot(hist['Recall'], label='train recall')
-            axs[2].plot(hist['val_Recall'], label='test recall')
+    
+            # macro recall
+            axs[2].plot(hist['macro_recall'], label='train macro recall')  
+            axs[2].plot(hist['val_macro_recall'], label='validation macro recall')  
+            axs[2].axhline(random_recall, color='black', linestyle='--', label='random recall test')
             axs[2].set_xlabel('epoch number')
-            axs[2].set_ylabel('Recall')
+            axs[2].set_ylabel('Macro Recall') 
             axs[2].legend(loc="upper right")
 
             plt.tight_layout()
             plt.show()
+
 
     def shuffle_col(self, df, df2, name):
         """
