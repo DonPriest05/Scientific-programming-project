@@ -106,7 +106,7 @@ In this case the null-hypothesis is not rejected thus the distribution between t
 
 For the cumulative categorical distribution the difference is plotted and a line is printed in the console.
 The console line states that the difference between the 2 distributions is significant if the Kolmogorov-Smirnov test Null-hypothesis can be rejected.
-So here we can also conclude that there is not significant difference between the sets. 
+So here we can also conclude that there is not a significant difference between the sets. 
 
 ![My Image](Images/table.PNG)
 
@@ -117,24 +117,38 @@ Moving to the categorize tab to view the table we decide to remove the column'co
 We will move to the edit data tab to this column in this case column number 50.
 After which we run the undersample method with random as parameter, giving us random undersampling to balance the classes.
 
+![My Image](Images/PCA_example_train.PNG)
+![My Image](Images/PCA_example_test.PNG)
+![My Image](Images/PCA_explained.PNG)
+![My Image](Images/PCA_PC1.PNG)
+![My Image](Images/PCA_PC2.PNG)
+
+Running the PCA gives us the PCA of the train in test set, with the loading plot and explained variance for each PC.
+The results of the PCA are not great as there is no clear distinction between classes in the plot.
+This makes sense since the number of components needed to explain 95% of the variance is almost all of the PCs.
+The PCA does show a clear overrepresentation of the healthy class.
+This we can resolve by downsampling this majority class.
+We use random downsampling here.
+
+![My Image](Images/TotalData.PNG)
+We can go back to the first tab to see that the total numbers have indeed changed and the classes are now balanced
 
 ![My Image](Images/setup.PNG)
 
-After this we are ready to set up the model parameters.
-We will move to the model tab and make a model consisting of 2 layers with the first layer having 20 nodes and the final layer having 2 nodes. 
+Moving on to the neural network model, we are ready to set up the model parameters.
+We will move to the model tab and make a model consisting of 2 layers with the first layer having 40 nodes, the middle layer 20 nodes and the final layer having 2 nodes. 
 The final layer must have as many nodes as there are phenotype variables (no mental health issues and mental health issues).
 We will also choose a dropout rate of 0.2. If you want to add another model this is possible with the add tab option.
 However, for this example we will just stick with one. For this model we will set a bootstrap size of 32,
-random seed of 23 and 200 epochs. If we run this without filling in these settings it will run the default ones,
+random seed of 1 and 1000 epochs. If we run this without filling in these settings it will run the default ones,
 which is 32 bootstrap size, random seed of 42 and 100 epochs.
 
 ![My Image](Images/resultplot.PNG)
 
-The results will be shown in a plot and in the command window. In this case the accuracy of the test set is not a good representation of the
-model as the data classes are quite imbalanced. So Precision and Recall metrics are more imformative.
+The results will be shown in a plot and in the command window. Categorical accuracy, macro precision and macro recall are displayed.
+The dotted line is the result if the classifier would randomly classify the classes.
 
-{'loss': 0.507735013961792, 'accuracy': 0.8305489420890808, 'Precision': 0.7116279006004333, 'Recall': 0.7303102612495422}
-
+{'loss': 0.5859974026679993, 'categorical_accuracy': 0.6181384325027466, 'macro_precision': 0.5173971056938171, 'macro_recall': 0.5805574655532837}
 ![My Image](Images/vars.PNG)
 
 The most important features in the data will be extracted and plotted in a bar plot showing

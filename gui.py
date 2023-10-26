@@ -18,7 +18,7 @@ from PyQt5.QtWidgets import QMainWindow, QApplication, \
     QLineEdit, QTableWidgetItem, QDoubleSpinBox, QCheckBox
 from methods import open_data, split_data, visualize_data, pca_analysis, model \
     , categorize_ui, set_seed_val, resample, compare_dist_num, compare_dist_cat, scale_for_model \
-        , macro_precision, macro_recall
+        , macro_precision, macro_recall, random_pred
         
 
 import concurrent.futures
@@ -316,7 +316,7 @@ class MainWindow(QMainWindow):
         dummified_train = dummified_data.iloc[:len(data_cat_train)]
         dummified_test = dummified_data.iloc[len(data_cat_train):]
 
-        dummified_train, data_num_train, dummified_test, data_num_test = \
+        __, data_num_train, __, data_num_test = \
             scale_for_model(dummified_train, data_num_train, dummified_test, data_num_test)
 
         # check the distribution between test and training set
@@ -565,14 +565,18 @@ class MainWindow(QMainWindow):
         print('Result is: \n')
 
         print(ensemble_result)
+        
+        # Get precision, recall and accuracy based on a random predictor
+        random_acc, random_recall, random_prec = random_pred(test_pheno)
 
         for hist in histories:
-            print(hist.keys())
+            
             fig, axs = plt.subplots(3, figsize=(8, 6))  # Create a 4-subplot figure
 
             # accuracy
             axs[0].plot(hist['categorical_accuracy'], label='train accuracy')
             axs[0].plot(hist['val_categorical_accuracy'], label='validation accuracy')
+            axs[0].axhline(random_acc, color='black', linestyle='--', label='random accuracy test')
             axs[0].set_xlabel('epoch number')
             axs[0].set_ylabel('Accuracy')
             axs[0].legend(loc="upper right")
@@ -580,6 +584,7 @@ class MainWindow(QMainWindow):
             # macro precision
             axs[1].plot(hist['macro_precision'], label='train macro precision')  
             axs[1].plot(hist['val_macro_precision'], label='validation macro precision') 
+            axs[1].axhline(random_prec, color='black', linestyle='--', label='random precision test')
             axs[1].set_xlabel('epoch number')
             axs[1].set_ylabel('Macro Precision')  # <-- Updated here
             axs[1].legend(loc="upper right")
@@ -587,6 +592,7 @@ class MainWindow(QMainWindow):
             # macro recall
             axs[2].plot(hist['macro_recall'], label='train macro recall')  
             axs[2].plot(hist['val_macro_recall'], label='validation macro recall')  
+            axs[2].axhline(random_recall, color='black', linestyle='--', label='random recall test')
             axs[2].set_xlabel('epoch number')
             axs[2].set_ylabel('Macro Recall') 
             axs[2].legend(loc="upper right")

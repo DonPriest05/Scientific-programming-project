@@ -19,7 +19,7 @@ from keras.layers import BatchNormalization
 import tensorflow as tf
 import tensorflow.keras.backend as K
 import random as rn
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, recall_score, precision_score
 
 pd.options.mode.chained_assignment = None  # default='warn'
 
@@ -510,18 +510,22 @@ def macro_recall(y_true, y_pred):
     
     return macro_recall
 
-def random_pred(y_true, y_pred):
-    y_random = np.random.choice([0, len(y_pred.columns)-1], size=len(y_pred))
-    y_random = pd.DataFrame(y_random, index = y_pred.index, columns = y_pred.columns)
+def random_pred(y_true):
+    accuracies = []
+    recalls = []
+    precisions = []
     
-    # Convert to dummy variables
-    y_random_dummy = y_random.get_dummies()
-    y_random_acc = accuracy_score(y_true, y_pred)
-    y_random_recall = macro_recall(y_true,y_random_dummy)
-    y_random_precision = macro_precision(y_true,y_random_dummy)
+    y_random_range = np.random.choice(y_true.columns, size=len(y_true)*100)
+    y_random_splits = np.split(y_random_range, 100)
     
-    return y_random_acc, y_random_recall, y_random_precision
+    for y_random in y_random_splits:
+        y_random_dummy = pd.get_dummies(y_random).reindex(columns=y_true.columns, fill_value=0)
+
+        accuracies.append(accuracy_score(y_true.values.argmax(axis=1), y_random_dummy.values.argmax(axis=1)))
+        recalls.append(recall_score(y_true, y_random_dummy, average='macro'))
+        precisions.append(precision_score(y_true, y_random_dummy, average='macro'))
     
+    return np.mean(accuracies), np.mean(precisions), np.mean(recalls)
 
 def model(cat_df, num_df, layers_model, dropout, num=True, cat=True, seed=0):
     """
@@ -687,7 +691,7 @@ def abbreviate_label(label, max_length=10):
 
 
 def compare_dist_cat(fullset, subset):
-    # Combine counts from all categorical variables
+    # Combine counts from all categorical variabls
     observed_counts = subset.sum(axis=0)
     full_counts = fullset.sum(axis=0)
 
@@ -697,7 +701,9 @@ def compare_dist_cat(fullset, subset):
 
     # Calculate empirical CDFs
     observed_cdf = np.cumsum(observed_prop)
+
     full_cdf = np.cumsum(full_prop)
+
 
     # Use the K-S test
     ks_statistic, p_value = ks_2samp(observed_cdf, full_cdf)
@@ -710,19 +716,30 @@ def compare_dist_cat(fullset, subset):
         print(
             "The distributions of cat variables in the subset and the entire dataset are NOT statistically different.")
 
-    plt.figure(figsize=(10, 6))
+    fig, axs = plt.subplots(2, 1, figsize=(10, 12))
     
-    # Plot the distribution for the subset
-    plt.plot(range(1, len(observed_cdf) + 1), observed_cdf, 'r--', label='Subset CDF', marker='o')  # red dotted line
+    # Calculate the difference between the two CDFs
+    difference = observed_cdf - full_cdf
     
-    # Plot the distribution for the full dataset
-    plt.plot(range(1, len(full_cdf) + 1), full_cdf, 'b-', label='Full Dataset CDF', marker='o')  # solid blue line
+    # plot the two CDFs
+    axs[0].plot(range(1, len(observed_cdf) + 1), observed_cdf, 'r--', label='Subset combined CDF', marker='o')
+    axs[0].plot(range(1, len(full_cdf) + 1), full_cdf, 'b-', label='Full Dataset combined CDF', marker='o', alpha=0.4)
+    axs[0].set_title('ECDFs for Subset and Full Dataset')
+    axs[0].set_xlabel('Categories (encoded)')
+    axs[0].set_ylabel('Cumulative Proportion')
+    axs[0].legend()
+    axs[0].grid(True)
     
-    plt.title('ECDFs for Subset and Full Dataset')
-    plt.xlabel('Categories (encoded)')
-    plt.ylabel('Cumulative Proportion')
-    plt.legend()
-    plt.grid(True)
+    # plot the difference
+    axs[1].plot(range(1, len(difference) + 1), difference, 'g-', label='Difference between CDFs', marker='o')
+    axs[1].axhline(0, color='black', linestyle='--')  # Add a line at y=0 for reference
+    axs[1].set_title('Difference between the two CDFs')
+    axs[1].set_xlabel('Categories (encoded)')
+    axs[1].set_ylabel('Difference in Cumulative Proportion')
+    axs[1].legend()
+    axs[1].grid(True)
+    
+    plt.tight_layout()
     plt.show()
 
 def compare_dist_num(fullset, subset):
