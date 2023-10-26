@@ -17,7 +17,9 @@ from keras.layers import Input
 from keras.layers import Concatenate
 from keras.layers import BatchNormalization
 import tensorflow as tf
+import tensorflow.keras.backend as K
 import random as rn
+from sklearn.metrics import accuracy_score
 
 pd.options.mode.chained_assignment = None  # default='warn'
 
@@ -480,6 +482,47 @@ def visualize_data(cat_data, selection, num_data, df_pheno):
     return fig
 
 
+def macro_precision(y_true, y_pred):
+    # Convert predictions to one-hot vectors
+    y_pred = K.round(K.clip(y_pred, 0, 1))
+    
+    # Calculate precision for each class
+    true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)), axis=0)
+    predicted_positives = K.sum(K.round(K.clip(y_pred, 0, 1)), axis=0)
+    precision = true_positives / (predicted_positives + K.epsilon())
+    
+    # Average precision across all classes
+    macro_precision = K.mean(precision)
+    
+    return macro_precision
+
+def macro_recall(y_true, y_pred):
+    # Convert predictions to one-hot vectors
+    y_pred = K.round(K.clip(y_pred, 0, 1))
+    
+    # Calculate recall for each class
+    true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)), axis=0)
+    actual_positives = K.sum(K.round(K.clip(y_true, 0, 1)), axis=0)
+    recall = true_positives / (actual_positives + K.epsilon())
+    
+    # Average recall across all classes
+    macro_recall = K.mean(recall)
+    
+    return macro_recall
+
+def random_pred(y_true, y_pred):
+    y_random = np.random.choice([0, len(y_pred.columns)-1], size=len(y_pred))
+    y_random = pd.DataFrame(y_random, index = y_pred.index, columns = y_pred.columns)
+    
+    # Convert to dummy variables
+    y_random_dummy = y_random.get_dummies()
+    y_random_acc = accuracy_score(y_true, y_pred)
+    y_random_recall = macro_recall(y_true,y_random_dummy)
+    y_random_precision = macro_precision(y_true,y_random_dummy)
+    
+    return y_random_acc, y_random_recall, y_random_precision
+    
+
 def model(cat_df, num_df, layers_model, dropout, num=True, cat=True, seed=0):
     """
     Creates a model instance
@@ -569,8 +612,7 @@ def model(cat_df, num_df, layers_model, dropout, num=True, cat=True, seed=0):
 
     # compile model and select metrics to keep track of
     model.compile(loss='categorical_crossentropy', \
-                  metrics=['accuracy', tf.keras.metrics.Precision(name='Precision'),
-                           tf.keras.metrics.Recall(name='Recall')])
+                  metrics=["categorical_accuracy", macro_precision, macro_recall])
     return model
 
 
@@ -668,18 +710,20 @@ def compare_dist_cat(fullset, subset):
         print(
             "The distributions of cat variables in the subset and the entire dataset are NOT statistically different.")
 
-    # Calculate the absolute difference
-    difference = np.abs(observed_cdf - full_cdf)
-
     plt.figure(figsize=(10, 6))
-    plt.plot(range(1, len(difference) + 1), difference, label='CDF Difference', marker='o', linestyle='-')
-    plt.title('Difference Between Subset CDF and Full Dataset CDF')
+    
+    # Plot the distribution for the subset
+    plt.plot(range(1, len(observed_cdf) + 1), observed_cdf, 'r--', label='Subset CDF', marker='o')  # red dotted line
+    
+    # Plot the distribution for the full dataset
+    plt.plot(range(1, len(full_cdf) + 1), full_cdf, 'b-', label='Full Dataset CDF', marker='o')  # solid blue line
+    
+    plt.title('ECDFs for Subset and Full Dataset')
     plt.xlabel('Categories (encoded)')
-    plt.ylabel('Absolute Difference in Cumulative Proportion')
+    plt.ylabel('Cumulative Proportion')
     plt.legend()
     plt.grid(True)
     plt.show()
-
 
 def compare_dist_num(fullset, subset):
     # Number of variables
@@ -844,7 +888,7 @@ def resample(cat, num, ph, len_data, under, over, name, neighbours=1, seed=0, sa
 
         selected_indices = [original_indices[i] for i in undersample.sample_indices_]
         data_re = pd.DataFrame(data_re, columns=all_cols, index=selected_indices)
-        pheno_re = pd.DataFrame(pheno_re, index=list(selected_indices))
+        #pheno_re = pd.DataFrame(pheno_re, index=list(selected_indices))
 
     elif over == True:
         methods = ['SMOTE', 'ADASYN']
@@ -862,7 +906,7 @@ def resample(cat, num, ph, len_data, under, over, name, neighbours=1, seed=0, sa
         data_re = pd.DataFrame(data_re, columns=all_cols)
         synthetic_indices = range(len_data + 1, len_data + 1 + len(data_re))
         data_re.index = synthetic_indices
-        pheno_re = pd.DataFrame(pheno_re, index=synthetic_indices)
+        #pheno_re = pd.DataFrame(pheno_re, index=synthetic_indices)
 
     # convert back to dataframe format
     data_re_cat = data_re[data_cat.columns]
