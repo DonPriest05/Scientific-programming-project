@@ -149,7 +149,7 @@ The results will be shown in a plot and in the command window. Categorical accur
 The dotted line is the result if the classifier would randomly classify the classes.
 
 {'loss': 0.5859974026679993, 'categorical_accuracy': 0.6181384325027466, 'macro_precision': 0.5173971056938171, 'macro_recall': 0.5805574655532837}
-![My Image](Images/vars.PNG)
+![My Image](Images/Importance.PNG)
 
 The most important features in the data will be extracted and plotted in a bar plot showing
 (higher loss change -> more importance)
