@@ -483,6 +483,22 @@ def visualize_data(cat_data, selection, num_data, df_pheno):
 
 
 def macro_precision(y_true, y_pred):
+    """
+    Computes the macro precision when given the ground truth and predicted values
+    ----------
+
+    y_true: pandas dataframe
+        Contains the true ground truth classes
+        
+    y_pred: pandas dataframe
+        Contains the predicted classes
+        
+    Returns
+    -------
+    
+    macro precision: float
+        Macro precision value   
+    """
     # Convert predictions to one-hot vectors
     y_pred = K.round(K.clip(y_pred, 0, 1))
     
@@ -497,6 +513,22 @@ def macro_precision(y_true, y_pred):
     return macro_precision
 
 def macro_recall(y_true, y_pred):
+    """
+    Computes the macro recall when given the ground truth and predicted values
+    ----------
+
+    y_true: pandas dataframe
+        Contains the true ground truth classes
+        
+    y_pred: pandas dataframe
+        Contains the predicted classes
+        
+    Returns
+    -------
+    
+    macro recall: float
+        Macro recall value   
+    """
     # Convert predictions to one-hot vectors
     y_pred = K.round(K.clip(y_pred, 0, 1))
     
@@ -511,6 +543,27 @@ def macro_recall(y_true, y_pred):
     return macro_recall
 
 def random_pred(y_true):
+    """
+    A random classifier, the classes it predicts are random
+    ----------
+
+    y_true: pandas dataframe
+        Contains the true ground truth classes
+        
+        
+    Returns
+    -------
+    
+    np.mean(accuracies): float
+        Mean of the accuracies computed over every iteration
+        
+    np.mean(precisions): float
+        Mean of the precisions computed over every iteration
+        
+    np.mean(recalls): float
+        Mean of the recalls computed over every iteration   
+
+    """
     accuracies = []
     recalls = []
     precisions = []
@@ -518,6 +571,7 @@ def random_pred(y_true):
     y_random_range = np.random.choice(y_true.columns, size=len(y_true)*100)
     y_random_splits = np.split(y_random_range, 100)
     
+    # Runs 100 times and takes the average
     for y_random in y_random_splits:
         y_random_dummy = pd.get_dummies(y_random).reindex(columns=y_true.columns, fill_value=0)
 
