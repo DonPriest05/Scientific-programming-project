@@ -157,17 +157,9 @@ The most important features in the data will be extracted and plotted in a bar p
 ## Notes
 
 - It may still be a bit buggy and sometimes requires a restart 
-- The edited file in the repository is an already categorized file, categories are chosen based on data from [2]
-[3][4]
-
 
 
 ## References
 
 [1] Tran, A., Tran, L., Geghre, N., Darmon, D., Rampal, M., Brandone, D., Gozzo, J.-M., Haas, H., Rebouillat-Savy, K., Caci, H., & Avillach, P. (2018). Data from: Health assessment of French university students and risk factors associated with mental health disorders (Version 1) [Data set]. Dryad. https://doi.org/10.5061/DRYAD.54QT7
 
-[2] Data downloads &gt; NCD (no date) RisC. Available at: https://ncdrisc.org/data-downloads.html (Accessed: December 22, 2022). 
-
-[3] Target heart rates chart (2022) www.heart.org. Available at: https://www.heart.org/en/healthy-living/fitness/fitness-basics/target-heart-rates (Accessed: December 22, 2022). 
-
-[4] Padilla, O. and Abadie, J. (2022) Urine tests: Normal values - resources, MSD Manual Professional Edition. MSD Manuals. Available at: https://www.msdmanuals.com/professional/resources/normal-laboratory-values/urine-tests-normal-values (Accessed: December 22, 2022). 
